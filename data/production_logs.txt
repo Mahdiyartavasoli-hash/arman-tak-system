@@ -1,0 +1,4 @@
+[2026-06-22 20:36:54] : device Arman_Tak_1 with 20 kg. is created ✅
+[2026-06-22 20:36:54] : device Tarnama_2 with 30 kg. is created ✅
+[2026-06-22 20:37:13] : device Arman_Tak_1 with 360 kg. is created ✅
+[2026-06-22 20:37:13] : device Tarnama_2 with 540 kg. is created ✅
