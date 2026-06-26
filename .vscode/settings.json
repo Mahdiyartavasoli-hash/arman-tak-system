@@ -1,0 +1,11 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "database": "${workspaceFolder:arman-tak-system}/factory",
+            "name": "Arman_Tak_DB"
+        }
+    ],
+    "sqltools.useNodeRuntime": true
+}
