@@ -1,10 +1,26 @@
--- CREATE TABLE production (
---     id INTEGER PRIMARY KEY AUTOINCREMENT,
---     machine_name TEXT,
---     amount INTEGER,
---     date TEXT
--- );
+-- [CREATE_TABLE]
+CREATE TABLE production (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    machine_name TEXT,
+    amount INTEGER,
+    date TEXT
+);
 
+-- [INSERT_PRODUCTION]
+INSERT INTO production (machine_name, amount, date)
+VALUES (?, ?, ?);
 
-INSERT INTO production (machin_name, amount, date)
-VALUES ('Arman_Tak_Machine', 550, '2026-06-25 11:45:00');
+-- [SELECT_ALL]
+SELECT * FROM production;
+
+-- [UPDATE_PRODUCTION]
+UPDATE production SET amount = ? WHERE machine_name = ? AND date = ?;
+
+-- [DELETE_PRODUCTION]
+DELETE FROM production WHERE id = ?;
+
+-- [SELECT_HIGH_PRODUCTION]
+SELECT * FROM production WHERE machine_name = ? AND amount > ?;
+
+-- [SELECT_ORDERED_PRODUCTION]
+SELECT * FROM production WHERE machine_name = ? ORDER BY amount DESC;
