@@ -6,17 +6,22 @@ num_1 = factory_managers.CementBlockMachine("Arman_Tak_1")
 num_2 = factory_managers.AsphaltMachine("Arman_Tak_2")
 
 while True:
-    print("\n--- 🏗️ ARMAN TAK Factory Management System ---")
-    print("1. Log Production for Machines")
-    print("2. View All Production Logs")
-    print("3. Update Production Record")
-    print("4. Delete Production Record")
-    print("5. Report: High Production Records")  
-    print("6. Report: Production Sorted by Highest Amount")  
-    print("7. Live Bitcoin Price")  
-    print("0. Exit")
+    print("""
+        --- 🏗️ ARMAN TAK Factory Management System ---
+        1. Log Production for Machines
+        2. View All Production Logs
+        3. Update Production Record
+        4. Delete Production Record
+        5. Report: High Production Records
+        6. Report: Production Sorted by Highest Amount
+        7. Report: Machine Production Analytics (Total & Average)
+        8. Report: Max & Min Production Records
+        9. Report: Total Production Count
+        10. Live Bitcoin Price
+        0. Exit
+        """)
     
-    user = input("Please select an option (0-7): ")
+    user = input("Please select an option (0-9): ")
     
 
     if user == "1":
@@ -42,7 +47,7 @@ while True:
             rows = cursor.fetchall()
             
             if not rows:
-                print("📭 No production reports found in database!")
+                print("🚨 No production reports found in database!")
             else:
                 print("\n📋 --- Database Production Logs ---")
                 for row in rows:
@@ -72,7 +77,7 @@ while True:
 
 
     elif user == "4":
-        print("\n🗑️ --- Delete Production Record ---")
+        print("\n📊 --- Delete Production Record ---")
         try:
             rec_id = int(input("Enter the ID of the record you want to delete: "))
         except ValueError:
@@ -91,7 +96,7 @@ while True:
 
 
     elif user == "5":
-        print("\n🔍 --- High Production Report ---")
+        print("\n📊 --- High Production Report ---")
         machine_name = input("Enter machine name (e.g., Arman_Tak_1): ")
         try:
             min_amount = int(input("Enter minimum production amount (kg): "))
@@ -102,7 +107,7 @@ while True:
         records = factory_managers.get_high_production(machine_name, min_amount)
         
         if not records:
-            print("📭 No records found matching the criteria!")
+            print("🚨 No records found matching the criteria!")
         else:
             print(f"\n📊 Records above {min_amount} kg for {machine_name}:")
             for row in records:
@@ -116,7 +121,7 @@ while True:
         records = factory_managers.get_ordered_production(machine_name)
         
         if not records:
-            print("📭 No records found for this machine!")
+            print("🚨 No records found for this machine!")
         else:
             print(f"\n🔝 {machine_name} records from highest to lowest production:")
             for row in records:
@@ -124,6 +129,45 @@ while True:
 
 
     elif user == "7":
+        print("\n📊 --- Machine Production Analytics ---")
+        machine_name = input("Enter machine name (e.g., Arman_Tak_1): ")
+            
+        analytics = factory_managers.get_machine_analytics(machine_name)
+            
+        total_prod = analytics[0]
+        avg_prod = analytics[1]
+            
+        print(f"\n📊 Performance Metrics for {machine_name}:")
+        print(f"💰 Total Production: {total_prod:,} kg") 
+        print(f"🧮 Average Production: {avg_prod:,.2f} kg") 
+
+
+    elif user == "8":
+        print("\n📊 --- Machine MAX & MIN Analytics ---")
+    
+        machine_name = input("Enter machine name (e.g., Arman_Tak_1): ")
+            
+        extremes = factory_managers.get_machine_extremes(machine_name)
+            
+        max_prod = extremes[0]
+        min_prod = extremes[1]
+            
+        print(f"\n📊 Performance Metrics for {machine_name}:")
+        print(f" MAX Production: {max_prod:,} kg") 
+        print(f" MIN Production: {min_prod:,} kg")
+
+
+    elif user == "9":
+            print("\n📊 --- Total Production Count ---")
+        
+            machine_name = input("Enter machine name (e.g., Arman_Tak_1): ")
+                        
+            total_runs = factory_managers.get_machine_production_count(machine_name)
+                
+            print(f"\n📊 Total Production for {machine_name}:")
+            print(f"🔢 Total Production Log Count: {total_runs:,} times")
+
+    elif user == "10":
         print("\n🪙 --- Fetching Live Bitcoin Price ---")
         price = web_tools.get_btc_price()
         print(f"Current BTC Price: {price}")           
@@ -134,4 +178,4 @@ while True:
         break
         
     else:
-        print("⚠️ Invalid option! Please select between 0 and 6.")
+        print("❌ Invalid option! Please select between 0 and 10.")
