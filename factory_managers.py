@@ -66,14 +66,14 @@ class AsphaltMachine(Machine):
             return f"❌ Error: {self.name} is offline!"
 
 
-def update_machine_production(machine_name, new_amount, target_date): 
+def update_machine_production(record_id, new_amount): 
     try:
         connection = sqlite3.connect("factory.db")
         cursor = connection.cursor()  
         
         sql_command = get_sql_query("UPDATE_PRODUCTION")
         if sql_command:
-            cursor.execute(sql_command, (new_amount, machine_name, target_date))
+            cursor.execute(sql_command, (new_amount, record_id))
             connection.commit()
             connection.close()
             return True

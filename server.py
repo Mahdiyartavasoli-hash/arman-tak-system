@@ -43,3 +43,21 @@ def add_production_log(record: ProductionRecord):
     factory_managers.save_to_database(record.machine_name, record.production_amount)
     
     return {"status": "success", "message": "Record added successfully"}
+
+class UpdateProduction(BaseModel):
+    record_id: int
+    new_production_amount: float
+
+@server.put("/update_production")
+def update_production_log(data: UpdateProduction):
+    factory_managers.update_machine_production(data.record_id, data.new_production_amount) 
+    
+    return {"status": "success", "message": "Record updated successfully"} 
+
+class DeleteProduction(BaseModel):
+     record_id: int
+@server.delete("/delete_production") 
+def delete_production_log(data: DeleteProduction):
+    factory_managers.delete_production_record(data.record_id)
+
+    return {"status": "success", "message": "Record deleted successfully"}  

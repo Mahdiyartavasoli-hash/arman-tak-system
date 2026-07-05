@@ -16,7 +16,7 @@ SELECT * FROM production;
 
 
 -- [UPDATE_PRODUCTION]
-UPDATE production SET amount = ? WHERE machine_name = ? AND date = ?;
+UPDATE production SET amount = ? WHERE id = ?;
 
 
 -- [DELETE_PRODUCTION]
