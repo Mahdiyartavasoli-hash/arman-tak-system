@@ -18,7 +18,7 @@ def get_sql_query(query_name):
         return None
 
 
-def save_to_database(machine_name, amount):
+def save_to_database(machine_id, amount):
     try:
         connection = sqlite3.connect("factory.db")
         cursor = connection.cursor()
@@ -26,7 +26,7 @@ def save_to_database(machine_name, amount):
     
         sql_command = get_sql_query("INSERT_PRODUCTION")
         if sql_command:
-            cursor.execute(sql_command, (machine_name, amount, now))
+            cursor.execute(sql_command, (machine_id, amount, now))
             connection.commit()
             connection.close()
             return True
@@ -39,15 +39,16 @@ def save_to_database(machine_name, amount):
 
 
 class Machine:
-    def __init__(self, name, is_active=True):
+    def __init__(self, name, machine_id, is_active=True):  
         self.name = name
+        self.machine_id = machine_id
         self.is_active = is_active
 
 class CementBlockMachine(Machine):
     def produce(self, amount):
         if self.is_active:
             self.amount = amount
-            if save_to_database(self.name, self.amount):
+            if save_to_database(self.machine_id, self.amount):
                 return f"✅ Production Success: {self.name} produced {self.amount} kg."
             else:
                 return "❌ Error: Could not save to database."
@@ -58,13 +59,13 @@ class AsphaltMachine(Machine):
     def produce(self, amount):
         if self.is_active:
             self.amount = amount
-            if save_to_database(self.name, self.amount):
+            if save_to_database(self.machine_id, self.amount):
                 return f"✅ Production Success: {self.name} produced {self.amount} kg."
             else:
                 return "❌ Error: Could not save to database."
         else:
             return f"❌ Error: {self.name} is offline!"
-
+        
 
 def update_machine_production(record_id, new_amount): 
     try:

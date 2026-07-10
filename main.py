@@ -2,8 +2,8 @@ import sqlite3
 import factory_managers  
 import web_tools
 # Assuming num_1 and num_2 are instantiated somewhere here, for example:
-num_1 = factory_managers.CementBlockMachine("Arman_Tak_1")
-num_2 = factory_managers.AsphaltMachine("Arman_Tak_2")
+num_1 = factory_managers.CementBlockMachine("Arman_Tak_1", machine_id=1)
+num_2 = factory_managers.AsphaltMachine("Arman_Tak_2", machine_id=2)
 
 while True:
     print("""
@@ -21,7 +21,7 @@ while True:
         0. Exit
         """)
     
-    user = input("Please select an option (0-9): ")
+    user = input("Please select an option (0-10): ")
     
 
     if user == "1":
@@ -42,8 +42,8 @@ while True:
         try:
             connection = sqlite3.connect("factory.db")
             cursor = connection.cursor()
-            
-            cursor.execute("SELECT * FROM production")
+            records = factory_managers.get_sql_query("SELECT_PRODUCTION_WITH_JOIN")
+            cursor.execute(records)
             rows = cursor.fetchall()
             
             if not rows:
@@ -60,16 +60,14 @@ while True:
 
     elif user == "3":
         print("\n🔧 --- Edit Production Record ---")
-        m_name = input("Enter machine name (Arman_Tak_1 or Tarnama_2): ")
         try:
+            rec_id = int(input("Enter the ID of the record you want to update: "))
             new_amt = float(input("Enter correct production amount (kg): "))
         except ValueError:
-            print("❌ Invalid amount! Please enter a number.")
+            print("❌ Invalid input! Please enter valid numbers.")
             continue
-            
-        t_date = input("Enter production date (YYYY-MM-DD): ")
-        
-        success = factory_managers.update_machine_production(m_name, new_amt, t_date)
+
+        success = factory_managers.update_machine_production(rec_id, new_amt)
         if success:
             print("\n✅ Production database updated successfully!")
         else:
