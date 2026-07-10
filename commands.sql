@@ -24,23 +24,35 @@ DELETE FROM production WHERE id = ?;
 
 
 -- [SELECT_HIGH_PRODUCTION]
-SELECT * FROM production WHERE machine_name = ? AND amount > ?;
-
+SELECT p.id, m.machine_name, p.amount, p.date
+FROM production p
+INNER JOIN machines m ON p.machine_id = m.id
+WHERE m.machine_name = ? AND p.amount > ?;
 
 -- [SELECT_ORDERED_PRODUCTION]
-SELECT * FROM production WHERE machine_name = ? ORDER BY amount DESC;
-
+SELECT p.id, m.machine_name, p.amount, p.date
+FROM production p
+INNER JOIN machines m ON p.machine_id = m.id
+WHERE m.machine_name = ? 
+ORDER BY p.amount DESC;
 
 -- [get_analytics]
-SELECT SUM(amount), AVG(amount) FROM production WHERE machine_name = ?
-
+SELECT SUM(p.amount), AVG(p.amount) 
+FROM production p
+INNER JOIN machines m ON p.machine_id = m.id
+WHERE m.machine_name = ?;
 
 -- [get_max_min]
-SELECT MAX(amount), MIN(amount) FROM production WHERE machine_name = ?
-
+SELECT MAX(p.amount), MIN(p.amount) 
+FROM production p
+INNER JOIN machines m ON p.machine_id = m.id
+WHERE m.machine_name = ?;
 
 -- [get_production_count]
-SELECT COUNT(amount) FROM production WHERE machine_name = ?
+SELECT COUNT(p.amount) 
+FROM production p
+INNER JOIN machines m ON p.machine_id = m.id
+WHERE m.machine_name = ?;
 
 
 -- [CREATE_MACHINES_TABLE]
