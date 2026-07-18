@@ -6,5 +6,5 @@ def get_btc_price():
         btc = adress["bitcoin"]["usd"]
         return f"the lastst price of BTC is : {btc} "
     except:
-        return 65000.0
+        return "The internet connection is poor."
 
