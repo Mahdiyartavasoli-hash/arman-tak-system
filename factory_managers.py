@@ -1,6 +1,12 @@
 import datetime
-import sqlite3
+import os
+import psycopg2  
 
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mahdiar_user:my_secure_password@localhost:5432/arman_tak_db")
+
+def get_db_connection():
+    
+    return psycopg2.connect(DATABASE_URL)
 
 def get_sql_query(query_name):
     try:
@@ -10,7 +16,7 @@ def get_sql_query(query_name):
         queries = content.split("-- ")
         for q in queries:
             if q.startswith(f"[{query_name}]"):
-                return q.replace(f"[{query_name}]", "").strip()
+                return q.replace(f"[{query_name}]", "").strip().replace("?", "%s")
         print(f"⚠️ Query [{query_name}] not found in commands.sql!")
         return None
     except FileNotFoundError:
@@ -20,7 +26,7 @@ def get_sql_query(query_name):
 
 def save_to_database(machine_id, amount):
     try:
-        connection = sqlite3.connect("factory.db")
+        connection = get_db_connection()
         cursor = connection.cursor()
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -33,7 +39,7 @@ def save_to_database(machine_id, amount):
         else:
             connection.close()
             return False
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print("❌ Database Error:", e)
         return False
 
@@ -69,7 +75,7 @@ class AsphaltMachine(Machine):
 
 def update_machine_production(record_id, new_amount): 
     try:
-        connection = sqlite3.connect("factory.db")
+        connection = get_db_connection()
         cursor = connection.cursor()  
         
         sql_command = get_sql_query("UPDATE_PRODUCTION")
@@ -81,14 +87,14 @@ def update_machine_production(record_id, new_amount):
         else:
             connection.close()
             return False
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print("❌ Database Error inside update function:", e)
         return False
 
 
 def delete_production_record(record_id):
     try:
-        connection = sqlite3.connect("factory.db")
+        connection = get_db_connection()
         cursor = connection.cursor()
         
         sql_command = get_sql_query("DELETE_PRODUCTION")
@@ -100,14 +106,14 @@ def delete_production_record(record_id):
         else:
             connection.close()
             return False
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print("❌ Database Error inside delete function:", e)
         return False
     
 
 def get_high_production(machine_name, min_amount):
     try:
-        connection = sqlite3.connect("factory.db") 
+        connection = get_db_connection() 
         cursor = connection.cursor()
         sql_command = get_sql_query("SELECT_HIGH_PRODUCTION")  
         if sql_command:
@@ -118,14 +124,14 @@ def get_high_production(machine_name, min_amount):
         else:
             connection.close()
             return []
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print("❌ Database Error:", e)
         return []
 
 
 def get_ordered_production(machine_name):
     try:
-        connection = sqlite3.connect("factory.db") 
+        connection = get_db_connection() 
         cursor = connection.cursor()
         sql_command = get_sql_query("SELECT_ORDERED_PRODUCTION")  
         if sql_command:
@@ -136,14 +142,14 @@ def get_ordered_production(machine_name):
         else:
             connection.close()
             return []
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print("❌ Database Error:", e)
         return []
 
 
 def get_machine_analytics(machine_name):
     try:
-        connection = sqlite3.connect("factory.db") 
+        connection = get_db_connection() 
         cursor = connection.cursor()
         sql_command = get_sql_query("get_analytics")  
         if sql_command:
@@ -156,14 +162,14 @@ def get_machine_analytics(machine_name):
         else:
             connection.close()
             return (0, 0)
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print("❌ Database Error:", e)
         return (0, 0)
 
 
 def get_machine_extremes(machine_name):
     try:
-        connection = sqlite3.connect("factory.db") 
+        connection = get_db_connection() 
         cursor = connection.cursor()
         sql_command = get_sql_query("get_max_min")  
         if sql_command:
@@ -176,14 +182,14 @@ def get_machine_extremes(machine_name):
         else:
             connection.close()
             return (0, 0)
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print("❌ Database Error:", e)
         return (0, 0)
 
 
 def get_machine_production_count(machine_name):
     try:
-        connection = sqlite3.connect("factory.db") 
+        connection = get_db_connection() 
         cursor = connection.cursor()
         sql_command = get_sql_query("get_production_count")  
         if sql_command:
@@ -196,7 +202,6 @@ def get_machine_production_count(machine_name):
         else:
             connection.close()
             return 0
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print("❌ Database Error:", e)
         return 0
-    

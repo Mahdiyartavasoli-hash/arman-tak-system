@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  
+  db:
+    image: postgres:15-alpine
+    container_name: arman_tak_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: mahdiyar_user
+      POSTGRES_PASSWORD: my_secure_password
+      POSTGRES_DB: arman_tak_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  
+  web:
+    build: .
+    container_name: arman_tak_web_app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://mahdiar_user:my_secure_password@db:5432/arman_tak_db
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
