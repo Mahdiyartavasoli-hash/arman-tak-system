@@ -5,13 +5,12 @@ services:
   db:
     image: postgres:15-alpine
     container_name: arman_tak_postgres
-    restart: always
     environment:
-      POSTGRES_USER: mahdiyar_user
+      POSTGRES_USER: mahdiar_user
       POSTGRES_PASSWORD: my_secure_password
       POSTGRES_DB: arman_tak_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

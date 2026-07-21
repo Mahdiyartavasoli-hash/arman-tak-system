@@ -2,21 +2,21 @@
 from fastapi import FastAPI
 import factory_managers
 from pydantic import BaseModel
-
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mahdiar_user:my_secure_password@localhost:5432/arman_tak_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mahdiar_user:my_secure_password@127.0.0.1:5433/arman_tak_db")
 
 def get_db_connection():
-    
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     return conn
 
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
+    
+    # ۱. جدول factory_managers
     cur.execute("""
         CREATE TABLE IF NOT EXISTS factory_managers (
             id SERIAL PRIMARY KEY,
@@ -24,13 +24,36 @@ def init_db():
             role VARCHAR(50) NOT NULL
         );
     """)
+    
+    # ۲. جدول machines
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS machines (
+            id SERIAL PRIMARY KEY,
+            machine_name VARCHAR(100) NOT NULL,
+            model_year INTEGER
+        );
+    """)
+
+    # ۳. جدول production
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS production (
+            id SERIAL PRIMARY KEY,
+            machine_id INTEGER REFERENCES machines(id),
+            amount INTEGER,
+            date VARCHAR(50)
+        );
+    """)
+    
     conn.commit()
     cur.close()
     conn.close()
 
-# init_db()
-
 server = FastAPI()
+
+@server.on_event("startup")
+def startup_event():
+    init_db()
+
 @server.get("/")
 def home():
     return {"message": "Welcome to ARMAN TAK Factory API"}
