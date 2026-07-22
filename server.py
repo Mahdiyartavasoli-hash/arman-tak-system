@@ -3,12 +3,21 @@ from pydantic import BaseModel, Field
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Database Connection Configuration ---
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mahdiar_user:my_secure_password@127.0.0.1:5433/arman_tak_db")
 
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5433"),
+        database=os.getenv("DB_NAME", "arman_tak_db"),
+        user=os.getenv("DB_USER", "mahdiar_user"),
+        password=os.getenv("DB_PASSWORD", "my_secure_password")
+    )
 
 def init_db():
     conn = get_db_connection()
