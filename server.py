@@ -1,72 +1,44 @@
+import os
+import asyncpg
+import aiosql
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
-import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
+from security import hash_password
+
 load_dotenv()
+
+# --- Load SQL Queries ---
+queries = aiosql.from_path("queries.sql", "asyncpg", mandatory_parameters=False)
 
 # --- Database Connection Configuration ---
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mahdiar_user:my_secure_password@127.0.0.1:5433/arman_tak_db")
 
-def get_db_connection():
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5433"),
-        database=os.getenv("DB_NAME", "arman_tak_db"),
-        user=os.getenv("DB_USER", "mahdiar_user"),
-        password=os.getenv("DB_PASSWORD", "my_secure_password")
-    )
-
-def init_db():
-    conn = get_db_connection()
-    cur = conn.cursor()
+# --- Async Lifetime & Database Pool Setup ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.db = await asyncpg.create_pool(DATABASE_URL)
     
-    # 1. Table: factory_managers
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS factory_managers (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            role VARCHAR(50) NOT NULL
-        );
-    """)
-    
-    # 2. Table: machines
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS machines (
-            id SERIAL PRIMARY KEY,
-            machine_name VARCHAR(100) NOT NULL,
-            model_year INTEGER
-        );
-    """)
-
-    # 3. Table: production
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS production (
-            id SERIAL PRIMARY KEY,
-            machine_id INTEGER REFERENCES machines(id) ON DELETE CASCADE,
-            amount INTEGER NOT NULL,
-            date VARCHAR(50) NOT NULL
-        );
-    """)
-    
-    conn.commit()
-    cur.close()
-    conn.close()
+    async with app.state.db.acquire() as conn:
+        await queries.create_table_factory_managers(conn)
+        await queries.create_table_machines(conn)
+        await queries.create_table_production(conn)
+        await queries.create_table_users(conn)
+        
+    yield
+    await app.state.db.close()
 
 # --- FastAPI Initialization ---
 server = FastAPI(
     title="Arman Tak System API",
-    description="Enterprise API for Managing Factory Machines and Production Logs",
-    version="1.0.0"
+    description="Clean Architecture API with Separate SQL Layer",
+    version="3.0.0",
+    lifespan=lifespan
 )
 
-@server.on_event("startup")
-def startup_event():
-    init_db()
-
-# --- Pydantic Schemas for Request Validation ---
+# --- Pydantic Schemas ---
 class MachineCreate(BaseModel):
     machine_name: str = Field(..., example="CementBlockMachine")
     model_year: int = Field(..., example=2024)
@@ -80,132 +52,68 @@ class ProductionUpdate(BaseModel):
     record_id: int = Field(..., example=1)
     new_amount: int = Field(..., gt=0, example=250)
 
-# --- Routes / Endpoints ---
+class UserRegister(BaseModel):
+    username: str = Field(..., example="mahdiar")
+    password: str = Field(..., example="secret123")
+
+# --- Endpoints ---
 
 @server.get("/", tags=["General"])
-def home():
-    return {"message": "Welcome to ARMAN TAK Factory API"}
+async def home():
+    return {"message": "Welcome to ARMAN TAK Factory API (Clean SQL Architecture)"}
 
-# 1. Create a Machine (Prerequisite for logging production)
+# 1. Create Machine
 @server.post("/machines", status_code=status.HTTP_201_CREATED, tags=["Machines"])
-def create_machine(machine: MachineCreate):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO machines (machine_name, model_year) VALUES (%s, %s) RETURNING id;",
-            (machine.machine_name, machine.model_year)
-        )
-        new_id = cur.fetchone()['id']
-        conn.commit()
-        cur.close()
+async def create_machine(machine: MachineCreate):
+    async with server.state.db.acquire() as conn:
+        new_id = await queries.create_machine(conn, machine_name=machine.machine_name, model_year=machine.model_year)
         return {"status": "success", "machine_id": new_id, "message": "Machine created successfully"}
-    except Exception as e:
-        if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn: conn.close()
 
-# 2. Insert Production Log (Validated against machines table)
+# 2. Insert Production Log
 @server.post("/insert_production", status_code=status.HTTP_201_CREATED, tags=["Production"])
-def add_production_log(record: ProductionCreate):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        # Foreign Key Existence Check
-        cur.execute("SELECT id FROM machines WHERE id = %s;", (record.machine_id,))
-        if not cur.fetchone():
+async def add_production_log(record: ProductionCreate):
+    async with server.state.db.acquire() as conn:
+        machine_exists = await queries.check_machine_exists(conn, machine_id=record.machine_id)
+        if not machine_exists:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Machine with ID {record.machine_id} does not exist."
             )
 
-        # Insert Production
-        cur.execute(
-            "INSERT INTO production (machine_id, amount, date) VALUES (%s, %s, %s) RETURNING id;",
-            (record.machine_id, record.amount, record.date)
+        production_id = await queries.insert_production(
+            conn, machine_id=record.machine_id, amount=record.amount, date=record.date
         )
-        production_id = cur.fetchone()['id']
-        conn.commit()
-        cur.close()
         return {
             "status": "success",
             "message": "Production record logged successfully",
             "data": {"id": production_id, "machine_id": record.machine_id, "amount": record.amount, "date": record.date}
         }
-    except HTTPException as http_ex:
-        raise http_ex
-    except Exception as e:
-        if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-    finally:
-        if conn: conn.close()
 
 # 3. Update Production Log
 @server.put("/update_production", tags=["Production"])
-def update_production_log(data: ProductionUpdate):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("UPDATE production SET amount = %s WHERE id = %s RETURNING id;", (data.new_amount, data.record_id))
-        updated = cur.fetchone()
-        
-        if not updated:
+async def update_production_log(data: ProductionUpdate):
+    async with server.state.db.acquire() as conn:
+        updated_id = await queries.update_production(conn, new_amount=data.new_amount, record_id=data.record_id)
+        if not updated_id:
             raise HTTPException(status_code=404, detail=f"Record with ID {data.record_id} not found.")
 
-        conn.commit()
-        cur.close()
         return {"status": "success", "message": "Record updated successfully"}
-    except HTTPException as http_ex:
-        raise http_ex
-    except Exception as e:
-        if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn: conn.close()
 
 # 4. Delete Production Log
 @server.delete("/delete_production/{record_id}", tags=["Production"])
-def delete_production_log(record_id: int):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM production WHERE id = %s RETURNING id;", (record_id,))
-        deleted = cur.fetchone()
-
-        if not deleted:
+async def delete_production_log(record_id: int):
+    async with server.state.db.acquire() as conn:
+        deleted_id = await queries.delete_production(conn, record_id=record_id)
+        if not deleted_id:
             raise HTTPException(status_code=404, detail=f"Record with ID {record_id} not found.")
 
-        conn.commit()
-        cur.close()
         return {"status": "success", "message": "Record deleted successfully"}
-    except HTTPException as http_ex:
-        raise http_ex
-    except Exception as e:
-        if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn: conn.close()
 
 # 5. Analytics Endpoint
 @server.get("/analytics/{machine_id}", tags=["Analytics"])
-def get_factory_analytics(machine_id: int):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT SUM(amount) as total_production, AVG(amount) as average_production FROM production WHERE machine_id = %s;",
-            (machine_id,)
-        )
-        result = cur.fetchone()
-        cur.close()
-
+async def get_factory_analytics(machine_id: int):
+    async with server.state.db.acquire() as conn:
+        result = await queries.get_analytics(conn, machine_id=machine_id)
         if not result or result['total_production'] is None:
             raise HTTPException(status_code=404, detail="No production records found for this machine.")
 
@@ -214,9 +122,22 @@ def get_factory_analytics(machine_id: int):
             "total_production": result['total_production'],
             "average_production": round(float(result['average_production']), 2)
         }
-    except HTTPException as http_ex:
-        raise http_ex
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn: conn.close()
+
+# 6. User Register
+@server.post("/register", status_code=status.HTTP_201_CREATED, tags=["Auth"])
+async def register_user(user_data: UserRegister):
+    hashed_pwd = hash_password(user_data.password)
+    
+    async with server.state.db.acquire() as conn:
+        try:
+            new_user_id = await queries.register_user(conn, username=user_data.username, password=hashed_pwd)
+            return {
+                "status": "success",
+                "message": "User registered successfully",
+                "user_id": new_user_id
+            }
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(
+                status_code=400, 
+                detail="Username already exists. Please choose another username."
+            )
