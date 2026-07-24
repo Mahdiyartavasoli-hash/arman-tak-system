@@ -2,11 +2,11 @@ import os
 import asyncpg
 import aiosql
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-
-from security import hash_password
+from security import hash_password,verify_password,create_access_token,get_current_user
+from fastapi.security import OAuth2PasswordRequestForm
 
 load_dotenv()
 
@@ -141,3 +141,35 @@ async def register_user(user_data: UserRegister):
                 status_code=400, 
                 detail="Username already exists. Please choose another username."
             )
+
+
+# 7. Login User
+@server.post("/login", tags=["Auth"])
+async def login_user(form_data: OAuth2PasswordRequestForm = Depends()):
+    async with server.state.db.acquire() as conn:
+    
+        db_user = await queries.get_user_by_username(conn, username=form_data.username)
+        
+        if not db_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Invalid credentials"
+            )
+        
+
+        if not verify_password(form_data.password, db_user["password"]):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Invalid credentials"
+            )
+    
+        token = create_access_token({"sub": db_user["username"]})
+        
+        return {"access_token": token, "token_type": "bearer"}
+
+
+# توی server.py
+
+@server.get("/users/me", tags=["Auth"])
+async def read_users_me(current_user: str = Depends(get_current_user)):
+    return {"message": f"welcome to endopoit {current_user}"}

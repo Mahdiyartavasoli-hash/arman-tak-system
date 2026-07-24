@@ -60,3 +60,7 @@ WHERE machine_id = :machine_id;
 INSERT INTO users (username, password) 
 VALUES (:username, :password) 
 RETURNING id;
+
+
+-- name: get_user_by_username^
+SELECT * FROM users WHERE username = :username;
