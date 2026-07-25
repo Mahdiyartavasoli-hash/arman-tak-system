@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from security import hash_password,verify_password,create_access_token,get_current_user
+from security import hash_password, verify_password, create_access_token, get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
 
 load_dotenv()
@@ -22,10 +22,11 @@ async def lifespan(app: FastAPI):
     app.state.db = await asyncpg.create_pool(DATABASE_URL)
     
     async with app.state.db.acquire() as conn:
-        await queries.create_table_factory_managers(conn)
+        
+        # await queries.drop_table_users(conn)
+        await queries.create_table_users(conn)    
         await queries.create_table_machines(conn)
         await queries.create_table_production(conn)
-        await queries.create_table_users(conn)
         
     yield
     await app.state.db.close()
@@ -55,6 +56,7 @@ class ProductionUpdate(BaseModel):
 class UserRegister(BaseModel):
     username: str = Field(..., example="mahdiar")
     password: str = Field(..., example="secret123")
+    role: str = "operator"
 
 # --- Endpoints ---
 
@@ -64,14 +66,28 @@ async def home():
 
 # 1. Create Machine
 @server.post("/machines", status_code=status.HTTP_201_CREATED, tags=["Machines"])
-async def create_machine(machine: MachineCreate):
+async def create_machine(
+    machine: MachineCreate, 
+    current_user: str = Depends(get_current_user)
+):
     async with server.state.db.acquire() as conn:
+        
+        db_user = await queries.get_user_by_username(conn, username=current_user)
+        
+        
+        if not db_user or db_user["role"] != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins are allowed to perform this action"
+            )
+            
+        
         new_id = await queries.create_machine(conn, machine_name=machine.machine_name, model_year=machine.model_year)
         return {"status": "success", "machine_id": new_id, "message": "Machine created successfully"}
 
 # 2. Insert Production Log
 @server.post("/insert_production", status_code=status.HTTP_201_CREATED, tags=["Production"])
-async def add_production_log(record: ProductionCreate):
+async def add_production_log(record: ProductionCreate, current_user: str = Depends(get_current_user)):
     async with server.state.db.acquire() as conn:
         machine_exists = await queries.check_machine_exists(conn, machine_id=record.machine_id)
         if not machine_exists:
@@ -79,14 +95,22 @@ async def add_production_log(record: ProductionCreate):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Machine with ID {record.machine_id} does not exist."
             )
+        
+        db_user = await queries.get_user_by_username(conn, username=current_user)
 
         production_id = await queries.insert_production(
-            conn, machine_id=record.machine_id, amount=record.amount, date=record.date
+            conn, machine_id=record.machine_id, user_id=db_user["id"], amount=record.amount, date=record.date
         )
         return {
             "status": "success",
             "message": "Production record logged successfully",
-            "data": {"id": production_id, "machine_id": record.machine_id, "amount": record.amount, "date": record.date}
+            "data": {
+                "id": production_id, 
+                "machine_id": record.machine_id, 
+                "user_id": db_user["id"],
+                "amount": record.amount, 
+                "date": record.date
+            }
         }
 
 # 3. Update Production Log
@@ -130,7 +154,12 @@ async def register_user(user_data: UserRegister):
     
     async with server.state.db.acquire() as conn:
         try:
-            new_user_id = await queries.register_user(conn, username=user_data.username, password=hashed_pwd)
+            new_user_id = await queries.register_user(
+                conn,
+                username=user_data.username,
+                password=hashed_pwd,
+                role=user_data.role
+            )
             return {
                 "status": "success",
                 "message": "User registered successfully",
@@ -142,12 +171,10 @@ async def register_user(user_data: UserRegister):
                 detail="Username already exists. Please choose another username."
             )
 
-
 # 7. Login User
 @server.post("/login", tags=["Auth"])
 async def login_user(form_data: OAuth2PasswordRequestForm = Depends()):
     async with server.state.db.acquire() as conn:
-    
         db_user = await queries.get_user_by_username(conn, username=form_data.username)
         
         if not db_user:
@@ -156,7 +183,6 @@ async def login_user(form_data: OAuth2PasswordRequestForm = Depends()):
                 detail="Invalid credentials"
             )
         
-
         if not verify_password(form_data.password, db_user["password"]):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, 
@@ -167,9 +193,7 @@ async def login_user(form_data: OAuth2PasswordRequestForm = Depends()):
         
         return {"access_token": token, "token_type": "bearer"}
 
-
-# توی server.py
-
+# 8. Read Current User
 @server.get("/users/me", tags=["Auth"])
 async def read_users_me(current_user: str = Depends(get_current_user)):
-    return {"message": f"welcome to endopoit {current_user}"}
+    return {"message": f"welcome to endpoint {current_user}"}

@@ -19,7 +19,7 @@ def hash_password(password: str) -> str:
 def verify_password(pass_log: str, pass_hash: str) -> bool:
     return passcode.verify(pass_log, pass_hash)
 
-def create_access_token(data:dict):
+def create_access_token(data: dict):
     to_encode = data.copy()
     expire_time = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire_time})
@@ -42,7 +42,3 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Could not validate credentials"
         )
-
-                           
-
-    

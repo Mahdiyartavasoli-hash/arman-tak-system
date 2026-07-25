@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS machines (
 CREATE TABLE IF NOT EXISTS production (
     id SERIAL PRIMARY KEY,
     machine_id INTEGER REFERENCES machines(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     amount INTEGER NOT NULL,
     date VARCHAR(50) NOT NULL
 );
@@ -24,7 +25,8 @@ CREATE TABLE IF NOT EXISTS production (
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'operator'
 );
 
 -- name: create-machine$
@@ -36,8 +38,8 @@ RETURNING id;
 SELECT id FROM machines WHERE id = :machine_id;
 
 -- name: insert-production$
-INSERT INTO production (machine_id, amount, date) 
-VALUES (:machine_id, :amount, :date) 
+INSERT INTO production (machine_id, user_id, amount, date) 
+VALUES (:machine_id, :user_id, :amount, :date) 
 RETURNING id;
 
 -- name: update-production$
@@ -57,10 +59,15 @@ FROM production
 WHERE machine_id = :machine_id;
 
 -- name: register-user$
-INSERT INTO users (username, password) 
-VALUES (:username, :password) 
+INSERT INTO users (username, password, role) 
+VALUES (:username, :password, :role) 
 RETURNING id;
-
 
 -- name: get_user_by_username^
 SELECT * FROM users WHERE username = :username;
+
+-- name: drop_table_users!
+DROP TABLE IF EXISTS users CASCADE;
+
+-- name: drop_table_production!
+DROP TABLE IF EXISTS production CASCADE;
