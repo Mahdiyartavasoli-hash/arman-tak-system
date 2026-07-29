@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from security import hash_password, verify_password, create_access_token, get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
+from exceptions import DuplicateEntityError, EntityNotFoundError
+from handlers import duplicate_entity_exception_handler, entity_not_found_exception_handler
 
 load_dotenv()
 
@@ -38,6 +40,9 @@ server = FastAPI(
     version="3.0.0",
     lifespan=lifespan
 )
+
+server.add_exception_handler(DuplicateEntityError, duplicate_entity_exception_handler)
+server.add_exception_handler(EntityNotFoundError, entity_not_found_exception_handler)
 
 # --- Pydantic Schemas ---
 class MachineCreate(BaseModel):
@@ -76,10 +81,7 @@ async def create_machine(
         
         
         if not db_user or db_user["role"] != "admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admins are allowed to perform this action"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins are allowed to perform this action")
             
         
         new_id = await queries.create_machine(conn, machine_name=machine.machine_name, model_year=machine.model_year)
@@ -91,10 +93,7 @@ async def add_production_log(record: ProductionCreate, current_user: str = Depen
     async with server.state.db.acquire() as conn:
         machine_exists = await queries.check_machine_exists(conn, machine_id=record.machine_id)
         if not machine_exists:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Machine with ID {record.machine_id} does not exist."
-            )
+            raise EntityNotFoundError(f"Machine with ID {record.machine_id} does not exist.")
         
         db_user = await queries.get_user_by_username(conn, username=current_user)
 
@@ -119,7 +118,7 @@ async def update_production_log(data: ProductionUpdate):
     async with server.state.db.acquire() as conn:
         updated_id = await queries.update_production(conn, new_amount=data.new_amount, record_id=data.record_id)
         if not updated_id:
-            raise HTTPException(status_code=404, detail=f"Record with ID {data.record_id} not found.")
+            raise EntityNotFoundError(f"Record with ID {data.record_id} not found.")
 
         return {"status": "success", "message": "Record updated successfully"}
 
@@ -129,7 +128,7 @@ async def delete_production_log(record_id: int):
     async with server.state.db.acquire() as conn:
         deleted_id = await queries.delete_production(conn, record_id=record_id)
         if not deleted_id:
-            raise HTTPException(status_code=404, detail=f"Record with ID {record_id} not found.")
+            raise EntityNotFoundError(f"Record with ID {record_id} not found.")
 
         return {"status": "success", "message": "Record deleted successfully"}
 
@@ -139,8 +138,7 @@ async def get_factory_analytics(machine_id: int):
     async with server.state.db.acquire() as conn:
         result = await queries.get_analytics(conn, machine_id=machine_id)
         if not result or result['total_production'] is None:
-            raise HTTPException(status_code=404, detail="No production records found for this machine.")
-
+            raise EntityNotFoundError(f"No production records found for machine ID {machine_id}.")
         return {
             "machine_id": machine_id,
             "total_production": result['total_production'],
@@ -166,10 +164,7 @@ async def register_user(user_data: UserRegister):
                 "user_id": new_user_id
             }
         except asyncpg.UniqueViolationError:
-            raise HTTPException(
-                status_code=400, 
-                detail="Username already exists. Please choose another username."
-            )
+            raise DuplicateEntityError("Username already exists. Please choose another username.")
 
 # 7. Login User
 @server.post("/login", tags=["Auth"])
@@ -178,16 +173,10 @@ async def login_user(form_data: OAuth2PasswordRequestForm = Depends()):
         db_user = await queries.get_user_by_username(conn, username=form_data.username)
         
         if not db_user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, 
-                detail="Invalid credentials"
-            )
+            raise HTTPException(status_code=401, detail="Invalid credentials")
         
         if not verify_password(form_data.password, db_user["password"]):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, 
-                detail="Invalid credentials"
-            )
+            raise HTTPException(status_code=401, detail="Invalid credentials")
     
         token = create_access_token({"sub": db_user["username"]})
         
