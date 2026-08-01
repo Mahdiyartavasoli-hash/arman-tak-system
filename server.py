@@ -13,9 +13,11 @@ from handlers import duplicate_entity_exception_handler, entity_not_found_except
 load_dotenv()
 
 # --- Load SQL Queries ---
+
 queries = aiosql.from_path("queries.sql", "asyncpg", mandatory_parameters=False)
 
 # --- Database Connection Configuration ---
+
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mahdiar_user:my_secure_password@127.0.0.1:5433/arman_tak_db")
 
 # --- Async Lifetime & Database Pool Setup ---
@@ -34,6 +36,7 @@ async def lifespan(app: FastAPI):
     await app.state.db.close()
 
 # --- FastAPI Initialization ---
+
 server = FastAPI(
     title="Arman Tak System API",
     description="Clean Architecture API with Separate SQL Layer",
@@ -45,22 +48,23 @@ server.add_exception_handler(DuplicateEntityError, duplicate_entity_exception_ha
 server.add_exception_handler(EntityNotFoundError, entity_not_found_exception_handler)
 
 # --- Pydantic Schemas ---
+
 class MachineCreate(BaseModel):
-    machine_name: str = Field(..., example="CementBlockMachine")
-    model_year: int = Field(..., example=2024)
+    machine_name: str = Field(..., examples=["CementBlockMachine"])
+    model_year: int = Field(..., examples=[2024])
 
 class ProductionCreate(BaseModel):
-    machine_id: int = Field(..., example=1, description="ID of the machine")
-    amount: int = Field(..., gt=0, example=200, description="Production amount must be > 0")
-    date: str = Field(..., example="2026-07-21", description="Date formatted YYYY-MM-DD")
+    machine_id: int = Field(..., examples=[1], description="ID of the machine")
+    amount: int = Field(..., gt=0, examples=[200], description="Production amount must be > 0")
+    date: str = Field(..., examples=["2026-07-21"], description="Date formatted YYYY-MM-DD")
 
 class ProductionUpdate(BaseModel):
-    record_id: int = Field(..., example=1)
-    new_amount: int = Field(..., gt=0, example=250)
+    record_id: int = Field(..., examples=[1])
+    new_amount: int = Field(..., gt=0, examples=[250])
 
 class UserRegister(BaseModel):
-    username: str = Field(..., example="mahdiar")
-    password: str = Field(..., example="secret123")
+    username: str = Field(..., examples=["mahdiar"])
+    password: str = Field(..., examples=["secret123"])
     role: str = "operator"
 
 # --- Endpoints ---
