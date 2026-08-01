@@ -9,6 +9,7 @@ from security import hash_password, verify_password, create_access_token, get_cu
 from fastapi.security import OAuth2PasswordRequestForm
 from exceptions import DuplicateEntityError, EntityNotFoundError
 from handlers import duplicate_entity_exception_handler, entity_not_found_exception_handler
+from celery_app import generate_heavy_analytics_report
 
 load_dotenv()
 
@@ -190,3 +191,16 @@ async def login_user(form_data: OAuth2PasswordRequestForm = Depends()):
 @server.get("/users/me", tags=["Auth"])
 async def read_users_me(current_user: str = Depends(get_current_user)):
     return {"message": f"welcome to endpoint {current_user}"}
+
+# 9. Asynchronous Analytics Report Generation (Celery & Redis)
+
+@server.post("/generate_report/{machine_id}", status_code=202, tags=["Analytics"])
+async def trigger_analytics_report(machine_id: int):
+    
+    task = generate_heavy_analytics_report.delay(machine_id)
+    
+    return {
+        "status": "processing",
+        "task_id": task.id,
+        "message": f"Analytics report generation started in background for machine #{machine_id}."
+    }
